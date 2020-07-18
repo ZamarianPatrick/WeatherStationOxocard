@@ -1,0 +1,50 @@
+.head{
+    width: 100%;
+    min-height: 80px;
+    height: 10vh;
+    border-radius: 10px;
+    border-style: solid;
+    border-width: 1px;
+    border-color: black;
+    text-align: center;
+    background-color: orange;
+}
+
+@media(max-width: 730px){
+    .optional{
+        display: none;
+    }
+}
+
+.head-title{
+    font-size: 48px;
+}
+
+.content{
+    width: 80%;
+    max-height: calc(100vh - 100px);
+    height: calc(90vh - 50px);
+    margin: auto;
+    background-color: rgb(185, 185, 185);
+    border-radius: 10px;
+    border-style: solid;
+    margin-top: 20px;
+    padding: 0px 20px;
+}
+
+.content h1{
+    text-align: center;
+}
+
+#dynamic{
+    text-align: center;
+}
+
+#dynamic img{
+    max-width: 100%;
+    max-height: calc(60vh - 100px);
+}
+
+.dynamic-value{
+    font-size: 10vw;
+}
