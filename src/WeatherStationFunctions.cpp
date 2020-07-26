@@ -102,7 +102,7 @@ void displayTextImpl(void *args){
             oxocard.matrix->drawImage(oxocard.weather->getDrawableIcon());
             vTaskDelay(500);
         }
-        oxocard.matrix->drawText(WeatherStationFunctions::viewTxt, false);
+        oxocard.matrix->drawText(WeatherStationFunctions::viewTxt, false, false, 150);
         WeatherStationFunctions::textDisplayed = true;
     }
 
@@ -121,7 +121,12 @@ void WeatherStationFunctions::displayText(){
         break;
 
     case CMD_TIME:
-        sprintf(viewTxt, "%i:%i", oxocard.clock->getHour(), oxocard.clock->getMinute());
+        sprintf(viewTxt, "%02d.%02d.%02d %02d:%02d",
+            oxocard.clock->getDay(),
+            oxocard.clock->getMonth() + 1,
+            oxocard.clock->getYear(), 
+            oxocard.clock->getHour(), 
+            oxocard.clock->getMinute());
         break;
 
     default:
@@ -165,7 +170,13 @@ void WeatherStationFunctions::sendData(){
 }
 
 void getTimeTXT(char *txt){
-    sprintf(txt, "%i;%i:%i", CMD_TIME, oxocard.clock->getHour(), oxocard.clock->getMinute());
+    sprintf(txt, "%i;%02d.%02d.%02d<br> %02d:%02d",
+        CMD_TIME, 
+        oxocard.clock->getDay(),
+        oxocard.clock->getMonth() + 1,
+        oxocard.clock->getYear(),
+        oxocard.clock->getHour(), 
+        oxocard.clock->getMinute());
 }
 
 void WeatherStationFunctions::sendTime(){
