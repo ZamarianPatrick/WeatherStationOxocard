@@ -13,6 +13,11 @@ bool WeatherStationFunctions::textDisplayed = true;
 const char *town = "66310";
 long long WeatherStationFunctions::timestamp = 0; 
 
+float WeatherStationFunctions::roomTemperature = 0;
+float WeatherStationFunctions::roomHumidity = 0;
+
+DHT WeatherStationFunctions::dht(DHTPIN, DHTTYPE);
+
 void WeatherStationFunctions::wsOnConnect(uint8_t num){
     
     switch (appState){
@@ -26,6 +31,14 @@ void WeatherStationFunctions::wsOnConnect(uint8_t num){
         
         case CMD_TIME:
             sendTime(num);
+            break;
+
+        case CMD_ROOM_TEMPERATURE:
+            sendRoomTemperature(num);
+            break;
+
+        case CMD_ROOM_HUMIDITY:
+            sendRoomHumidity(num);
             break;
         
         default:
@@ -67,6 +80,14 @@ void WeatherStationFunctions::onButtonClick(ButtonEventCallback *event){
             setAppState(CMD_TIME);
             break;
 
+        case R1:
+            setAppState(CMD_ROOM_TEMPERATURE);
+            break;
+
+        case R2:
+            setAppState(CMD_ROOM_HUMIDITY);
+            break;
+
         default:
             break;
     }
@@ -85,9 +106,12 @@ void WeatherStationFunctions::startWebServer(){
     server.serve("/", "index.html");
     server.serve("/home", "index.html");
 
+    dht.begin();
     server.begin(false);
     websocketServer.begin();
     websocketServer.onEvent(onWebSocketEvent);
+
+    refreshData();
 }
 
 
@@ -110,14 +134,14 @@ void displayTextImpl(void *args){
 }
 
 void WeatherStationFunctions::displayText(){
-    
+
     switch (appState){
     case CMD_TEMPERATURE:
         sprintf(viewTxt, "%0.1f C", oxocard.weather->getTemperature());
         break;
     
     case CMD_HUMIDITY:
-        sprintf(viewTxt, "%0.1f %", oxocard.weather->getHumidity());
+        sprintf(viewTxt, "%0.1f %%", oxocard.weather->getHumidity());
         break;
 
     case CMD_TIME:
@@ -127,6 +151,14 @@ void WeatherStationFunctions::displayText(){
             oxocard.clock->getYear(), 
             oxocard.clock->getHour(), 
             oxocard.clock->getMinute());
+        break;
+
+    case CMD_ROOM_TEMPERATURE:
+        sprintf(viewTxt, "%0.1f C", roomTemperature);
+        break;
+
+    case CMD_ROOM_HUMIDITY:
+        sprintf(viewTxt, "%0.1f %%", roomHumidity);
         break;
 
     default:
@@ -146,7 +178,20 @@ void WeatherStationFunctions::displayText(){
 
 void WeatherStationFunctions::refreshData(){
     timestamp = getCurrentMillis();
-    if(appState == CMD_TEMPERATURE || appState == CMD_HUMIDITY) oxocard.weather->downloadWeatherForTown(town);
+
+    oxocard.weather->downloadWeatherForTown(town);
+
+    float t = 0;
+    float h = 0;
+
+    while(t == 0 || h == 0){
+        t = dht.readTemperature();
+        if(!isnan(t) && t != 0) roomTemperature = t;
+        
+        h = dht.readHumidity();
+        if(!isnan(h) && h != 0) roomHumidity = h;
+    }
+
     sendData();
 }
 
@@ -162,6 +207,14 @@ void WeatherStationFunctions::sendData(){
 
         case CMD_TIME:
             sendTime();
+            break;
+
+        case CMD_ROOM_TEMPERATURE:
+            sendRoomTemperature();
+            break;
+
+        case CMD_ROOM_HUMIDITY:
+            sendRoomHumidity();
             break;
 
         default:
@@ -195,6 +248,10 @@ void getHumidityTXT(char *txt){
     sprintf(txt, "%i;%0.1f;%i", CMD_HUMIDITY, oxocard.weather->getHumidity(), oxocard.weather->getIcon());
 }
 
+void WeatherStationFunctions::getRoomHumidityTXT(char *txt){
+    sprintf(txt, "%i;%0.1f", CMD_ROOM_HUMIDITY, roomHumidity);
+}
+
 void WeatherStationFunctions::sendHumidity(){
     char txt[50];
     getHumidityTXT(txt);
@@ -207,8 +264,24 @@ void WeatherStationFunctions::sendHumidity(uint8_t num){
     websocketServer.sendTXT(num, txt);
 }
 
+void WeatherStationFunctions::sendRoomHumidity(){
+    char txt[50];
+    getRoomHumidityTXT(txt);
+    websocketServer.broadcastTXT(txt);
+}
+
+void WeatherStationFunctions::sendRoomHumidity(uint8_t num){
+    char txt[50];
+    getRoomHumidityTXT(txt);
+    websocketServer.sendTXT(num, txt);
+}
+
 void getTemperatureTXT(char *txt){
     sprintf(txt, "%i;%0.1f;%i", CMD_TEMPERATURE, oxocard.weather->getTemperature(), oxocard.weather->getIcon());
+}
+
+void WeatherStationFunctions::getRoomTemperatureTXT(char *txt){
+    sprintf(txt, "%i;%0.1f", CMD_ROOM_TEMPERATURE, roomTemperature);
 }
 
 void WeatherStationFunctions::sendTemperature(){
@@ -223,14 +296,27 @@ void WeatherStationFunctions::sendTemperature(uint8_t num){
     websocketServer.sendTXT(num, txt);
 }
 
-void WeatherStationFunctions::loop(){
-    if(timestamp == 0) refreshData();
-    else if(getCurrentMillis() - timestamp > 30000) refreshData(); 
+void WeatherStationFunctions::sendRoomTemperature(){
+    char txt[50];
+    getRoomTemperatureTXT(txt);
+    websocketServer.broadcastTXT(txt);
+}
 
+void WeatherStationFunctions::sendRoomTemperature(uint8_t num){
+    char txt[50];
+    getRoomTemperatureTXT(txt);
+    websocketServer.sendTXT(num, txt);
+}
+
+void WeatherStationFunctions::loop(){    
     displayText();
+    
+    if(getCurrentMillis() - timestamp > 30000) refreshData(); 
 
     server.loop();
     websocketServer.loop();
+
+    vTaskDelay(3);
 }
 
 int WeatherStationFunctions::getAppState(){

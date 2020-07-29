@@ -49,6 +49,22 @@ socket.onmessage = function(e){
                 elContent.innerHTML = '<span class ="dynamic-value">' + split[1] + "</span>";
             }
             break;
+
+        case "3":
+            title = "Raumtemperatur"
+
+            if(!!elContent){
+                elContent.innerHTML = '<span class = "dynamic-value">' + split[1] + " &deg;C</span>";
+            }
+            break;
+
+        case "4":
+            title = "Raum Luftfeuchtigkeit"
+
+            if(!!elContent){
+                elContent.innerHTML = '<span class = "dynamic-value">' + split[1] + " %</span>";
+            }
+            break;
     
         default:
             break;

@@ -24,5 +24,5 @@ void setup() {
 }
 
 void loop() {
-    WeatherStationFunctions::loop();
+  WeatherStationFunctions::loop();  
 }

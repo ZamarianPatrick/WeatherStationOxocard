@@ -1,14 +1,19 @@
 #ifndef WEATHER_STATION_FUNCTIONS_H
 #define WEATHER_STATION_FUNCTIONS_H
 
-#define CMD_TEMPERATURE 0
-#define CMD_HUMIDITY 1
-#define CMD_TIME 2
-
 #include <OXOcardRunner.h>
+#include <DHT.h>
 
 #include "WebServer.hpp"
 #include <WebSocketsServer.h>
+
+#define CMD_TEMPERATURE 0
+#define CMD_HUMIDITY 1
+#define CMD_TIME 2
+#define CMD_ROOM_TEMPERATURE 3
+#define CMD_ROOM_HUMIDITY 4
+#define DHTPIN 17
+#define DHTTYPE DHT22
 
 class WeatherStationFunctions{
 
@@ -26,6 +31,10 @@ class WeatherStationFunctions{
         static WebSocketsServer websocketServer;
         static int appState;
         static long long timestamp;
+        static DHT dht;
+        static float roomTemperature;
+        static float roomHumidity;
+
 
         static void onWebSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length);
         static void wsOnConnect(uint8_t num);
@@ -34,8 +43,14 @@ class WeatherStationFunctions{
         static void sendData();
         static void sendTemperature();
         static void sendTemperature(uint8_t num);
+        static void getRoomTemperatureTXT(char *txt);
+        static void sendRoomTemperature();
+        static void sendRoomTemperature(uint8_t num);
         static void sendHumidity();
         static void sendHumidity(uint8_t num);
+        static void getRoomHumidityTXT(char *txt);
+        static void sendRoomHumidity();
+        static void sendRoomHumidity(uint8_t num);
         static void sendTime();
         static void sendTime(uint8_t num);
         static void displayText();
