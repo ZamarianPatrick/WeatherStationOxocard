@@ -5,8 +5,6 @@
 #include <wificonfiguration.h>
 #include <wireless.h>
 
-#include <WebSocketsServer.h>
-
 #include "src/WeatherStationFunctions.hpp"
 
 using namespace std;

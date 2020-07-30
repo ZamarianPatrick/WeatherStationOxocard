@@ -1,5 +1,6 @@
 #include <sys/time.h>
 
+#include <auto_turn_off.h>
 #include "WeatherStationFunctions.hpp"
 
 
@@ -17,6 +18,8 @@ float WeatherStationFunctions::roomTemperature = 0;
 float WeatherStationFunctions::roomHumidity = 0;
 
 DHT WeatherStationFunctions::dht(DHTPIN, DHTTYPE);
+IRrecv WeatherStationFunctions::ir(IR_PIN);
+decode_results WeatherStationFunctions::results;
 
 void WeatherStationFunctions::wsOnConnect(uint8_t num){
     
@@ -107,11 +110,16 @@ void WeatherStationFunctions::startWebServer(){
     server.serve("/home", "index.html");
 
     dht.begin();
+
     server.begin(false);
     websocketServer.begin();
     websocketServer.onEvent(onWebSocketEvent);
 
     refreshData();
+
+    ir.enableIRIn();
+
+    AutoTurnOff::getInstance().disable();
 }
 
 
@@ -170,7 +178,7 @@ void WeatherStationFunctions::displayText(){
         displayTextImpl,
         "displayText",
         1000,
-        &appState,
+        (void *) &appState,
         1,
         NULL);
     }
@@ -308,15 +316,62 @@ void WeatherStationFunctions::sendRoomTemperature(uint8_t num){
     websocketServer.sendTXT(num, txt);
 }
 
+void WeatherStationFunctions::onIR(int value){
+    switch(value){
+       
+        case IR_1:
+            setAppState(CMD_TEMPERATURE);
+            break;
+        
+        case IR_2:
+            setAppState(CMD_HUMIDITY);
+            break;
+
+        case IR_3:
+            setAppState(CMD_TIME);
+            break;
+
+        case IR_4:
+            setAppState(CMD_ROOM_TEMPERATURE);
+            break;
+
+        case IR_5:
+            setAppState(CMD_ROOM_HUMIDITY);
+            break;
+
+        case IR_6:
+            break;
+
+        case IR_7:
+            break;
+
+        case IR_STOP:
+            ir.disableIRIn();
+            oxocard.system->turnOff();
+            break;
+
+        default:
+            break;
+    }
+}
+
 void WeatherStationFunctions::loop(){    
+
     displayText();
     
-    if(getCurrentMillis() - timestamp > 30000) refreshData(); 
+    if(getCurrentMillis() - timestamp > 30000){
+        ir.disableIRIn();
+        refreshData();
+        ir.enableIRIn();
+    }
 
     server.loop();
     websocketServer.loop();
 
-    vTaskDelay(3);
+    if(ir.decode(&results)){
+        onIR(results.value);
+        ir.resume();
+    }
 }
 
 int WeatherStationFunctions::getAppState(){
@@ -324,8 +379,10 @@ int WeatherStationFunctions::getAppState(){
 }
 
 void WeatherStationFunctions::setAppState(int state){
+    ir.disableIRIn();
     appState = state;
     sendData();
+    ir.enableIRIn();
 }
 
 long long WeatherStationFunctions::getCurrentMillis(){
