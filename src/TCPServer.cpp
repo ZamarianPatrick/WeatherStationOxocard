@@ -32,20 +32,10 @@ void TCPServer::loop(){
     this->read();
 }
 
-void TCPServer::begin(bool newTask = true){
+void TCPServer::begin(){
     this->server.begin();
+}
 
-    if(newTask){
-        char name[16];
-        sprintf(name, "tt%i", taskCount);
-        xTaskCreate(
-            this->handleClientsImpl,   // Task function. 
-            name,     // name of task.
-            10000,       // Stack size of task
-            this,        // parameter of the task
-            1,           // priority of the task
-            NULL);      // Task handle to keep track of created task
-
-        taskCount++;
-    }
+void TCPServer::end(){
+    this->server.end();
 }

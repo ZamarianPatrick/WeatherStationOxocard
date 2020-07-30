@@ -12,10 +12,10 @@ using namespace std;
 void setup() {
   Serial.begin(115200);
 
-  oxocard.wifi->autoConnect();
+  oxocard.wifi->autoConnectWithoutRetries();
 
   oxocard.clock->setTimeZone(12);
-  WeatherStationFunctions::startWebServer();
+  WeatherStationFunctions::start();
 
   Serial.println("My IP address:");
   Serial.println(WiFi.localIP());

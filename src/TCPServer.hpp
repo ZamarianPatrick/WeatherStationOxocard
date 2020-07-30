@@ -17,7 +17,8 @@ class TCPServer{
         TCPServer(int port);
         ~TCPServer();
 
-        void begin(bool newTask);
+        void begin();
+        void end();
         void loop();
 
     protected:

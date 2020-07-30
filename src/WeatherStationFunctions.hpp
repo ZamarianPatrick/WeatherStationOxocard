@@ -13,6 +13,9 @@
 #define CMD_TIME 2
 #define CMD_ROOM_TEMPERATURE 3
 #define CMD_ROOM_HUMIDITY 4
+#define CMD_IP 5
+#define CMD_OXOCARD_OFF 6
+#define CMD_NO_CONNECTION 7
 
 #define IR_1 16724175
 #define IR_2 16718055
@@ -35,7 +38,7 @@ class WeatherStationFunctions{
         static bool textDisplayed;
         static char viewTxt[200];
         
-        static void startWebServer();
+        static void start();
         static void loop();
         static int getAppState();
         static void setAppState(int state);
@@ -69,6 +72,9 @@ class WeatherStationFunctions{
         static void sendRoomHumidity(uint8_t num);
         static void sendTime();
         static void sendTime(uint8_t num);
+        static void sendIP();
+        static void sendIP(uint8_t num);
+        static void sendOff();
         static void displayText();
         static void onButtonClick(ButtonEventCallback *event);
         static void onIR(int value);

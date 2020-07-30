@@ -3,10 +3,9 @@
 #include <auto_turn_off.h>
 #include "WeatherStationFunctions.hpp"
 
-
 WebServer WeatherStationFunctions::server = WebServer(80);
 WebSocketsServer WeatherStationFunctions::websocketServer = WebSocketsServer(5567);
-int WeatherStationFunctions::appState = 0;
+int WeatherStationFunctions::appState = CMD_NO_CONNECTION;
 
 char WeatherStationFunctions::viewTxt[200];
 bool WeatherStationFunctions::textDisplayed = true;
@@ -44,6 +43,10 @@ void WeatherStationFunctions::wsOnConnect(uint8_t num){
             sendRoomHumidity(num);
             break;
         
+        case CMD_IP:
+            sendIP(num);
+            break;
+
         default:
             break;
     }
@@ -91,13 +94,16 @@ void WeatherStationFunctions::onButtonClick(ButtonEventCallback *event){
             setAppState(CMD_ROOM_HUMIDITY);
             break;
 
+        case R3:
+            setAppState(CMD_IP);
+            break;
+
         default:
             break;
     }
 }
 
-void WeatherStationFunctions::startWebServer(){
-    
+void WeatherStationFunctions::start(){
     oxocard.buttonEvent->clickCallback(L1, onButtonClick);
     oxocard.buttonEvent->clickCallback(L2, onButtonClick);
     oxocard.buttonEvent->clickCallback(L3, onButtonClick);
@@ -110,14 +116,17 @@ void WeatherStationFunctions::startWebServer(){
     server.serve("/home", "index.html");
 
     dht.begin();
-
-    server.begin(false);
-    websocketServer.begin();
     websocketServer.onEvent(onWebSocketEvent);
 
-    refreshData();
+    if(oxocard.wifi->isConnected()){
+        server.begin();
+        websocketServer.begin();
 
-    ir.enableIRIn();
+        refreshData();
+        appState = CMD_TEMPERATURE;
+        
+        ir.enableIRIn();
+    }
 
     AutoTurnOff::getInstance().disable();
 }
@@ -143,17 +152,19 @@ void displayTextImpl(void *args){
 
 void WeatherStationFunctions::displayText(){
 
+    char tmp[200];
+
     switch (appState){
     case CMD_TEMPERATURE:
-        sprintf(viewTxt, "%0.1f C", oxocard.weather->getTemperature());
+        sprintf(tmp, "%0.1f C", oxocard.weather->getTemperature());
         break;
     
     case CMD_HUMIDITY:
-        sprintf(viewTxt, "%0.1f %%", oxocard.weather->getHumidity());
+        sprintf(tmp, "%0.1f %%", oxocard.weather->getHumidity());
         break;
 
     case CMD_TIME:
-        sprintf(viewTxt, "%02d.%02d.%02d %02d:%02d",
+        sprintf(tmp, "%02d.%02d.%02d %02d:%02d",
             oxocard.clock->getDay(),
             oxocard.clock->getMonth() + 1,
             oxocard.clock->getYear(), 
@@ -162,18 +173,34 @@ void WeatherStationFunctions::displayText(){
         break;
 
     case CMD_ROOM_TEMPERATURE:
-        sprintf(viewTxt, "%0.1f C", roomTemperature);
+        sprintf(tmp, "%0.1f C", roomTemperature);
         break;
 
     case CMD_ROOM_HUMIDITY:
-        sprintf(viewTxt, "%0.1f %%", roomHumidity);
+        sprintf(tmp, "%0.1f %%", roomHumidity);
+        break;
+
+    case CMD_IP:
+    {
+        IPAddress ip = WiFi.localIP();
+        sprintf(tmp, "%u.%u.%u.%u", ip[0], ip[1], ip[2], ip[3]);
+        break;
+    }
+
+    case CMD_NO_CONNECTION:
+        sprintf(tmp, "keine Internetverbindung");
         break;
 
     default:
         break;
     }
 
+    if(strcmp(tmp, viewTxt) != 0){
+        oxocard.matrix->cancelDrawText();
+    }
+
     if(textDisplayed){
+        sprintf(viewTxt, "%s", tmp);
         xTaskCreate(
         displayTextImpl,
         "displayText",
@@ -192,7 +219,9 @@ void WeatherStationFunctions::refreshData(){
     float t = 0;
     float h = 0;
 
-    while(t == 0 || h == 0){
+    int counter = 0;
+
+    while(counter < 10 && (t == 0 || h == 0)){
         t = dht.readTemperature();
         if(!isnan(t) && t != 0) roomTemperature = t;
         
@@ -223,6 +252,10 @@ void WeatherStationFunctions::sendData(){
 
         case CMD_ROOM_HUMIDITY:
             sendRoomHumidity();
+            break;
+
+        case CMD_IP:
+            sendIP();
             break;
 
         default:
@@ -316,6 +349,29 @@ void WeatherStationFunctions::sendRoomTemperature(uint8_t num){
     websocketServer.sendTXT(num, txt);
 }
 
+void getIPTXT(char *txt){
+    IPAddress ip = WiFi.localIP();
+    sprintf(txt, "%i;%u.%u.%u.%u", CMD_IP, ip[0], ip[1], ip[2], ip[3]);
+}
+
+void WeatherStationFunctions::sendIP(){
+    char txt[50];
+    getIPTXT(txt);
+    websocketServer.broadcastTXT(txt);
+}
+
+void WeatherStationFunctions::sendIP(uint8_t num){
+    char txt[50];
+    getIPTXT(txt);
+    websocketServer.sendTXT(num, txt);
+}
+
+void WeatherStationFunctions::sendOff(){
+    char txt[10];
+    sprintf(txt, "%i", CMD_OXOCARD_OFF);
+    websocketServer.broadcastTXT(txt);
+}
+
 void WeatherStationFunctions::onIR(int value){
     switch(value){
        
@@ -340,13 +396,13 @@ void WeatherStationFunctions::onIR(int value){
             break;
 
         case IR_6:
-            break;
-
-        case IR_7:
+            setAppState(CMD_IP);
             break;
 
         case IR_STOP:
             ir.disableIRIn();
+            sendOff();
+            websocketServer.close();
             oxocard.system->turnOff();
             break;
 
@@ -359,6 +415,18 @@ void WeatherStationFunctions::loop(){
 
     displayText();
     
+    if(!oxocard.wifi->isConnected()){
+        appState = CMD_NO_CONNECTION;
+        oxocard.wifi->autoConnectWithoutRetries();
+        return;
+    }else if(appState == CMD_NO_CONNECTION){
+        server.begin();
+        websocketServer.begin();
+        refreshData();
+        setAppState(CMD_TEMPERATURE);
+        ir.enableIRIn();
+    }
+
     if(getCurrentMillis() - timestamp > 30000){
         ir.disableIRIn();
         refreshData();
